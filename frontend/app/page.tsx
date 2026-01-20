@@ -8,7 +8,7 @@ export default function Home() {
     const [sessionId] = useState(() => `session_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`);
     const messagesEndRef = useRef<HTMLDivElement>(null);
 
-    const wsUrl = `ws://${process.env.NEXT_PUBLIC_BACKEN_URL}/ws` || 'ws://localhost:8000/ws';
+    const wsUrl = `ws://localhost:8000/ws`;
     const { messages, isConnected, isConnecting, sendMessage, reconnect } = useChatSocket(wsUrl, sessionId);
 
     // Auto-scroll to bottom when new messages arrive
@@ -119,7 +119,7 @@ export default function Home() {
                             onKeyUp={handleKeyPress}
                             placeholder={isConnected ? "Type your message..." : "Connecting..."}
                             disabled={!isConnected}
-                            className="flex-1 px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed"
+                            className="flex-1 text-black px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed"
                         />
                         <button
                             type="submit"
