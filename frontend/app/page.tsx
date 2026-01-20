@@ -10,7 +10,12 @@ export default function Home() {
 
     const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-    const wsUrl = `ws://localhost:8000/ws`;
+    // Use environment variable for backend URL, fallback to localhost:8000
+    const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'localhost:8000';
+    // Determine protocol based on current page protocol (ws for http, wss for https)
+    const protocol = typeof window !== 'undefined' && window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const wsUrl = `${protocol}//${backendUrl}/ws`;
+
     const { messages, isConnected, isConnecting, isLoading, sendMessage, reconnect } = useChatSocket(wsUrl, sessionId);
 
     // Auto-scroll to bottom when new messages arrive
