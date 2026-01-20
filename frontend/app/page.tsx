@@ -8,8 +8,10 @@ export default function Home() {
     const [sessionId] = useState(() => `session_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`);
     const messagesEndRef = useRef<HTMLDivElement>(null);
 
+    const textareaRef = useRef<HTMLTextAreaElement>(null);
+
     const wsUrl = `ws://localhost:8000/ws`;
-    const { messages, isConnected, isConnecting, sendMessage, reconnect } = useChatSocket(wsUrl, sessionId);
+    const { messages, isConnected, isConnecting, isLoading, sendMessage, reconnect } = useChatSocket(wsUrl, sessionId);
 
     // Auto-scroll to bottom when new messages arrive
     useEffect(() => {
@@ -21,13 +23,10 @@ export default function Home() {
         if (inputMessage.trim() && isConnected) {
             sendMessage(inputMessage.trim());
             setInputMessage('');
-        }
-    };
-
-    const handleKeyPress = (e: React.KeyboardEvent) => {
-        if (e.key === 'Enter' && !e.shiftKey) {
-            e.preventDefault();
-            handleSendMessage(e);
+            // Reset height
+            if (textareaRef.current) {
+                textareaRef.current.style.height = 'auto';
+            }
         }
     };
 
@@ -104,6 +103,17 @@ export default function Home() {
                             </div>
                         </div>
                     ))}
+                    {isLoading && (
+                        <div className="flex justify-start">
+                            <div className="bg-white text-gray-800 rounded-2xl rounded-bl-none shadow-md px-4 py-3">
+                                <div className="flex items-center gap-1">
+                                    <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce [animation-delay:-0.3s]"></span>
+                                    <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce [animation-delay:-0.15s]"></span>
+                                    <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"></span>
+                                </div>
+                            </div>
+                        </div>
+                    )}
                     <div ref={messagesEndRef} />
                 </div>
             </div>
@@ -111,20 +121,33 @@ export default function Home() {
             {/* Input Form */}
             <div className="bg-white border-t border-gray-200 px-4 py-4 shadow-lg">
                 <form onSubmit={handleSendMessage} className="max-w-4xl mx-auto">
-                    <div className="flex gap-2">
-                        <input
-                            type="text"
+                    <div className="flex gap-2 items-end">
+                        <textarea
+                            ref={(el) => {
+                                // @ts-ignore
+                                textareaRef.current = el;
+                            }}
                             value={inputMessage}
-                            onChange={(e) => setInputMessage(e.target.value)}
-                            onKeyUp={handleKeyPress}
+                            onChange={(e) => {
+                                setInputMessage(e.target.value);
+                                e.target.style.height = 'auto';
+                                e.target.style.height = `${e.target.scrollHeight}px`;
+                            }}
+                            onKeyDown={(e) => {
+                                if (e.key === 'Enter' && !e.shiftKey) {
+                                    e.preventDefault();
+                                    handleSendMessage(e);
+                                }
+                            }}
                             placeholder={isConnected ? "Type your message..." : "Connecting..."}
                             disabled={!isConnected}
-                            className="flex-1 text-black px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed"
+                            rows={1}
+                            className="flex-1 text-gray-900 bg-white px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed resize-none overflow-y-auto max-h-32 min-h-[46px]"
                         />
                         <button
                             type="submit"
                             disabled={!isConnected || !inputMessage.trim()}
-                            className="px-6 py-3 bg-blue-500 text-white font-medium rounded-lg hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
+                            className="px-6 py-3 h-[46px] bg-blue-500 text-white font-medium rounded-lg hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
                         >
                             Send
                         </button>

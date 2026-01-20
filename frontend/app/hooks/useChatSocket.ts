@@ -11,6 +11,7 @@ export function useChatSocket(wsUrl: string, sessionId: string) {
     const [messages, setMessages] = useState<Message[]>([]);
     const [isConnected, setIsConnected] = useState(false);
     const [isConnecting, setIsConnecting] = useState(false);
+    const [isLoading, setIsLoading] = useState(false);
     const wsRef = useRef<WebSocket | null>(null);
     const reconnectTimeoutRef = useRef<NodeJS.Timeout>(null);
     const reconnectAttemptsRef = useRef(0);
@@ -36,21 +37,25 @@ export function useChatSocket(wsUrl: string, sessionId: string) {
                 const agentMessage = event.data;
 
                 // add agent's response to messages
-                setMessages((prev) => [...prev, { role: 'agent', text: agentMessage }])
+                setMessages((prev) => [...prev, { role: 'agent', text: agentMessage }]);
+                setIsLoading(false);
             } catch (error) {
                 console.error('Error parsing message:', error);
+                setIsLoading(false);
             }
         };
 
         ws.onerror = (error) => {
             console.error('WebSocket error:', error);
             setIsConnecting(false);
+            setIsLoading(false);
         };
 
         ws.onclose = () => {
             console.log('WebSocket disconnected');
             setIsConnected(false);
             setIsConnecting(false);
+            setIsLoading(false);
             wsRef.current = null;
 
             // Auto-reconnect with exponential backoff
@@ -91,6 +96,7 @@ export function useChatSocket(wsUrl: string, sessionId: string) {
 
         // Add user message to state
         setMessages((prev) => [...prev, { role: 'user', text }]);
+        setIsLoading(true);
 
         // Send to server
         wsRef.current.send(text);
@@ -105,6 +111,7 @@ export function useChatSocket(wsUrl: string, sessionId: string) {
         messages,
         isConnected,
         isConnecting,
+        isLoading,
         sendMessage,
         reconnect,
     };
