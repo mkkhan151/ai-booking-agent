@@ -1,4 +1,5 @@
 from contextlib import asynccontextmanager
+import asyncio
 
 from agent import ChatClient
 from database import DbSession, init_db
@@ -62,17 +63,46 @@ async def websocket_endpoint(websocket: WebSocket, session_id: str, db: DbSessio
 
         # Main message loop
         while True:
-            # Receive plain text message from client
-            user_message = await websocket.receive_text()
+            # Receive the first message (blocking)
+            try:
+                first_message = await websocket.receive_text()
+            except RuntimeError:
+                # Handle socket disconnect during receive
+                break
 
             # Skip empty messages
-            if not user_message.strip():
+            if not first_message.strip():
                 continue
 
-            print(f"[WebSocket] Received from {session_id}: '{user_message}'")
+            # Start collecting potential subsequent messages
+            collected_messages = [first_message]
+            
+            # Message collection window in seconds
+            COLLECTION_WINDOW = 1.0
+            
+            while True:
+                try:
+                    # Wait for next message with a timeout
+                    next_message = await asyncio.wait_for(
+                        websocket.receive_text(), 
+                        timeout=COLLECTION_WINDOW
+                    )
+                    if next_message.strip():
+                        collected_messages.append(next_message)
+                except asyncio.TimeoutError:
+                    # Time window expired, stop collecting
+                    break
+                except Exception:
+                    # Any other error (disconnect etc), stop collecting
+                    break
+            
+            # Combine all collected messages into one context
+            full_user_message = "\n".join(collected_messages)
+            
+            print(f"[WebSocket] Received batch from {session_id}: {collected_messages}")
 
-            # Process message through AI agent
-            agent_response = chat_client.process_message(user_message)
+            # Process combined message through AI agent
+            agent_response = chat_client.process_message(full_user_message)
 
             # Send response back as plain text
             await websocket.send_text(agent_response)

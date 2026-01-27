@@ -1,6 +1,7 @@
 import json
 import os
 from typing import Dict, List
+from datetime import datetime
 
 import redis
 from database import DbSession
@@ -265,12 +266,24 @@ Important rules:
             )
 
             # Generate response with the new SDK
+            # Inject current date into system instruction
+            current_date = datetime.now().strftime("%Y-%m-%d %H:%M")
+            
+            dynamic_system_instruction = f"""Current Date: {current_date}
+            
+            {self.SYSTEM_INSTRUCTION}
+            
+            CRITICAL VALIDATION RULE:
+            - You MUST NOT schedule any appointments for dates in the past.
+            - Today is {current_date}. Any date before this is invalid.
+            - If a user asks for 'tomorrow', calculate it based on today's date ({current_date})."""
+
             response = self.client.models.generate_content(
                 model=self.MODEL,
                 contents=contents,
                 config=types.GenerateContentConfig(
                     tools=[self.TOOLS],
-                    system_instruction=self.SYSTEM_INSTRUCTION,
+                    system_instruction=dynamic_system_instruction,
                     temperature=0.7,
                     max_output_tokens=400,
                 ),
@@ -325,7 +338,7 @@ Important rules:
                             contents=current_contents,
                             config=types.GenerateContentConfig(
                                 tools=[self.TOOLS],
-                                system_instruction=self.SYSTEM_INSTRUCTION,
+                                system_instruction=dynamic_system_instruction,
                                 temperature=0.7,
                                 max_output_tokens=400,
                             ),
