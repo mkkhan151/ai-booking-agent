@@ -61,52 +61,67 @@ async def websocket_endpoint(websocket: WebSocket, session_id: str, db: DbSessio
             "Welcome to AI Booking Agent! How can I help you book a time slot today?"
         )
 
+        # Track the current processing task to allow cancellation
+        processing_task = None
+        current_message_buffer = []
+
+        async def process_and_respond(messages_to_process: str):
+            """Helper to process message and send response"""
+            try:
+                # Process combined message through AI agent
+                agent_response = await chat_client.process_message(messages_to_process)
+                
+                # Send response back as plain text
+                await websocket.send_text(agent_response)
+                print(f"[WebSocket] Sent to {session_id}: '{agent_response}'")
+            except asyncio.CancelledError:
+                print(f"[WebSocket] Processing cancelled for {session_id} (New message arrived)")
+                raise # Re-raise to let asyncio handle it
+            except Exception as e:
+                print(f"[WebSocket] Error during processing: {e}")
+                await websocket.send_text(f"Error: {str(e)}")
+
+        def on_task_done(future):
+            """Callback when a processing task finishes"""
+            # If the task finished successfully (not cancelled, no exception),
+            # it means it handled all messages currently in the buffer at the time of start.
+            # In this strict cancellation model, if a new message had arrived, 
+            # this task would have been cancelled.
+            # So if it finishes, we can safely clear the buffer.
+            if not future.cancelled() and not future.exception():
+                current_message_buffer.clear()
+
         # Main message loop
         while True:
-            # Receive the first message (blocking)
+            # Receive message (blocking)
             try:
-                first_message = await websocket.receive_text()
+                new_message = await websocket.receive_text()
             except RuntimeError:
-                # Handle socket disconnect during receive
                 break
-
-            # Skip empty messages
-            if not first_message.strip():
+            
+            if not new_message.strip():
                 continue
 
-            # Start collecting potential subsequent messages
-            collected_messages = [first_message]
+            print(f"[WebSocket] Received from {session_id}: '{new_message}'")
             
-            # Message collection window in seconds
-            COLLECTION_WINDOW = 1.0
-            
-            while True:
+            # If there is an active task running, cancel it
+            if processing_task and not processing_task.done():
+                print(f"[WebSocket] Cancelling previous task for {session_id}")
+                processing_task.cancel()
                 try:
-                    # Wait for next message with a timeout
-                    next_message = await asyncio.wait_for(
-                        websocket.receive_text(), 
-                        timeout=COLLECTION_WINDOW
-                    )
-                    if next_message.strip():
-                        collected_messages.append(next_message)
-                except asyncio.TimeoutError:
-                    # Time window expired, stop collecting
-                    break
-                except Exception:
-                    # Any other error (disconnect etc), stop collecting
-                    break
+                    await processing_task 
+                except asyncio.CancelledError:
+                    pass # Expected
             
-            # Combine all collected messages into one context
-            full_user_message = "\n".join(collected_messages)
+            # Add to buffer
+            current_message_buffer.append(new_message)
             
-            print(f"[WebSocket] Received batch from {session_id}: {collected_messages}")
-
-            # Process combined message through AI agent
-            agent_response = chat_client.process_message(full_user_message)
-
-            # Send response back as plain text
-            await websocket.send_text(agent_response)
-            print(f"[WebSocket] Sent to {session_id}: '{agent_response}'")
+            # Combine all pending messages
+            full_context = "\n".join(current_message_buffer)
+            
+            # Start new processing task
+            processing_task = asyncio.create_task(process_and_respond(full_context))
+            processing_task.add_done_callback(on_task_done)
 
     except WebSocketDisconnect:
         print(f"[WebSocket] Client {session_id} disconnected normally")

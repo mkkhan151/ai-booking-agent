@@ -234,7 +234,7 @@ Important rules:
             print(f"[Client {self.session_id}] {error_msg}")
             return error_msg
 
-    def process_message(self, user_message: str) -> str:
+    async def process_message(self, user_message: str) -> str:
         """
         Process a user message through the AI agent with tool calling.
 
@@ -278,7 +278,8 @@ Important rules:
             - Today is {current_date}. Any date before this is invalid.
             - If a user asks for 'tomorrow', calculate it based on today's date ({current_date})."""
 
-            response = self.client.models.generate_content(
+            # Use Async Client
+            response = await self.client.aio.models.generate_content(
                 model=self.MODEL,
                 contents=contents,
                 config=types.GenerateContentConfig(
@@ -310,6 +311,8 @@ Important rules:
                             function_args = part.function_call.args
 
                             # execute the tool
+                            # Note: Tools are currently synchronous (DB operations).
+                            # If they become slow, they should be wrapped in asyncio.to_thread
                             tool_result = self.execute_tool(
                                 function_name, function_args
                             )
@@ -332,8 +335,8 @@ Important rules:
                             types.Content(role="user", parts=function_responses)
                         )
 
-                        # Send function results back to model
-                        response = self.client.models.generate_content(
+                        # Send function results back to model (Async)
+                        response = await self.client.aio.models.generate_content(
                             model=self.MODEL,
                             contents=current_contents,
                             config=types.GenerateContentConfig(
