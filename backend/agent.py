@@ -26,7 +26,7 @@ class ChatClient:
     REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379")
     CHAT_HISTORY_TTL = 3600 * 24  # 24 hours
     MAX_TOOL_ITERATIONS = 5  # Prevent infinite loops
-    MODEL = "gemini-3-flash-preview"
+    MODEL = "gemini-2.0-flash"
 
     # System instruction for the AI agent
     SYSTEM_INSTRUCTION = """You are a polite and efficient Booking Assistant. Your role is to help users book 1-hour time slots between 9 AM and 5 PM.
